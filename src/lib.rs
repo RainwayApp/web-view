@@ -91,6 +91,7 @@ pub struct WebViewBuilder<'a, T: 'a, I, C> {
     pub width: i32,
     pub height: i32,
     pub resizable: bool,
+    pub borderless: bool,
     pub debug: bool,
     pub invoke_handler: Option<I>,
     pub user_data: Option<T>,
@@ -113,6 +114,7 @@ where
             width: 800,
             height: 600,
             resizable: true,
+            borderless: false,
             debug,
             invoke_handler: None,
             user_data: None,
@@ -160,6 +162,14 @@ where
     /// Defaults to `true`.
     pub fn resizable(mut self, resizable: bool) -> Self {
         self.resizable = resizable;
+        self
+    }
+
+    /// Sets the window style of the WebView window. If set to true, the window will have no frame.
+    ///
+    /// Defaults to `true`.
+    pub fn borderless(mut self, borderless: bool) -> Self {
+        self.borderless = borderless;
         self
     }
 
@@ -217,6 +227,7 @@ where
             self.width,
             self.height,
             self.resizable,
+            self.borderless,
             self.debug,
             user_data,
             invoke_handler,
@@ -271,6 +282,7 @@ impl<'a, T> WebView<'a, T> {
         width: i32,
         height: i32,
         resizable: bool,
+        borderless: bool,
         debug: bool,
         user_data: T,
         invoke_handler: I,
@@ -285,6 +297,14 @@ impl<'a, T> WebView<'a, T> {
             result: Ok(()),
         });
         let user_data_ptr = Box::into_raw(user_data);
+        
+        //currently borderless resizing is wonky, so this disables that combo.
+        let temp_resize = if resizable == true && borderless == true {
+            false
+        } else {
+            true
+        };
+        
 
         unsafe {
             let inner = wrapper_webview_new(
@@ -292,7 +312,8 @@ impl<'a, T> WebView<'a, T> {
                 url.as_ptr(),
                 width,
                 height,
-                resizable as _,
+                temp_resize as _,
+                borderless as _,
                 debug as _,
                 Some(ffi_invoke_handler::<T>),
                 user_data_ptr as _,
