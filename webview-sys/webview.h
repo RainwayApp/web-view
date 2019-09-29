@@ -38,8 +38,6 @@ extern "C" {
 #include <stdlib.h>
 #include <string.h>
 
-#define WEBVIEW_WINAPI
-
 #if defined(WEBVIEW_GTK)
 #include <JavaScriptCore/JavaScript.h>
 #include <gtk/gtk.h>
@@ -64,8 +62,6 @@ struct webview_priv {
 #include <mshtml.h>
 #include <shobjidl.h>
 #include <dwmapi.h>
-#include <Oleidl.h>
-#include <windowsx.h>
 
 #include <stdio.h>
 
