@@ -1271,7 +1271,7 @@ static LRESULT CALLBACK wndproc(HWND hwnd, UINT uMsg, WPARAM wParam,
   {
     if (w && w->borderless)
     {
-      POINT cursor = {GET_X_LPARAM(lParam), GET_Y_LPARAM(lParam)};
+      POINT cursor = {LOWORD(lParam), HIWORD(lParam)};
       return HitTest(hwnd, cursor, w->borderless);
     }
   }
@@ -1592,7 +1592,7 @@ WEBVIEW_API int webview_loop(struct webview *w, int blocking) {
     // allows for dragging of the UI
     if (msg.message == WM_LBUTTONDOWN && w->borderless)
     {
-      POINT cursor = {GET_X_LPARAM(msg.lParam), GET_Y_LPARAM(msg.lParam)};
+      POINT cursor = {LOWORD(msg.lParam), HIWORD(msg.lParam)};
       BOOL testDrag = cursor.y <= 70;
       if (testDrag == TRUE)
       {
