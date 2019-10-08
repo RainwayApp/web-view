@@ -25,11 +25,13 @@ extern crate boxfnonce;
 extern crate urlencoding;
 extern crate webview_sys as ffi;
 
+mod icon;
 mod color;
 mod dialog;
 mod error;
 mod escape;
 pub use color::Color;
+pub use icon::Icon;
 pub use dialog::DialogBuilder;
 pub use error::{CustomError, Error, WVResult};
 pub use escape::escape;
@@ -411,6 +413,11 @@ impl<'a, T> WebView<'a, T> {
     pub fn set_color<C: Into<Color>>(&mut self, color: C) {
         let color = color.into();
         unsafe { webview_set_color(self.inner, color.r, color.g, color.b, color.a) }
+    }
+
+    pub fn set_icon<I: Into<Icon>>(&mut self, icon: I) {
+        let icon = icon.into();
+        unsafe { webview_set_icon(self.inner, icon.data.as_ptr() as _, icon.length, icon.width, icon.height) }
     }
 
     /// Sets the title displayed at the top of the window.

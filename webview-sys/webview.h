@@ -34,6 +34,8 @@ extern "C" {
 #define WEBVIEW_API extern
 #endif
 
+#define WEBVIEW_WINAPI
+
 #include <stdint.h>
 #include <stdlib.h>
 #include <string.h>
@@ -162,6 +164,9 @@ WEBVIEW_API void webview_set_title(struct webview *w, const char *title);
 WEBVIEW_API void webview_set_fullscreen(struct webview *w, int fullscreen);
 WEBVIEW_API void webview_set_color(struct webview *w, uint8_t r, uint8_t g,
                                    uint8_t b, uint8_t a);
+WEBVIEW_API void webview_set_icon(struct webview *w, 
+                                  char * icon, uint32_t length, 
+                                  uint32_t width, uint32_t height);
 WEBVIEW_API void webview_dialog(struct webview *w,
                                 enum webview_dialog_type dlgtype, int flags,
                                 const char *title, const char *arg,
@@ -371,6 +376,10 @@ WEBVIEW_API void webview_set_color(struct webview *w, uint8_t r, uint8_t g,
   GdkRGBA color = {r / 255.0, g / 255.0, b / 255.0, a / 255.0};
   webkit_web_view_set_background_color(WEBKIT_WEB_VIEW(w->priv.webview),
                                        &color);
+}
+
+WEBVIEW_API void webview_set_icon(struct webview *w, char * icon, uint32_t length, uint32_t width, uint32_t height) {
+  
 }
 
 WEBVIEW_API void webview_dialog(struct webview *w,
@@ -1726,6 +1735,20 @@ WEBVIEW_API void webview_set_color(struct webview *w, uint8_t r, uint8_t g,
   SetClassLongPtr(w->priv.hwnd, GCLP_HBRBACKGROUND, (LONG_PTR)brush);
 }
 
+WEBVIEW_API void webview_set_icon(struct webview *w, char *icon, uint32_t length, uint32_t width, uint32_t height)
+{
+  int offset = LookupIconIdFromDirectoryEx(icon, TRUE, width, height, LR_DEFAULTCOLOR);
+  if (offset != 0)
+  {
+    HICON hIcon = CreateIconFromResourceEx(icon + offset, 0, TRUE, 0x00030000, width, height, LR_DEFAULTCOLOR);
+    if (hIcon)
+    {
+      SendMessage(w->priv.hwnd, WM_SETICON, ICON_SMALL, (LPARAM)hIcon);
+      SendMessage(w->priv.hwnd, WM_SETICON, ICON_BIG, (LPARAM)hIcon);
+    }
+  }
+}
+
 /* These are missing parts from MinGW */
 #ifndef __IFileDialog_INTERFACE_DEFINED__
 #define __IFileDialog_INTERFACE_DEFINED__
@@ -2392,6 +2415,10 @@ WEBVIEW_API void webview_set_color(struct webview *w, uint8_t r, uint8_t g,
   objc_msgSend(w->priv.window, sel_registerName("setOpaque:"), 0);
   objc_msgSend(w->priv.window,
                sel_registerName("setTitlebarAppearsTransparent:"), 1);
+}
+
+WEBVIEW_API void webview_set_icon(struct webview *w, char * icon, uint32_t length, uint32_t width, uint32_t height) {
+
 }
 
 WEBVIEW_API void webview_dialog(struct webview *w,
