@@ -1740,7 +1740,7 @@ WEBVIEW_API void webview_set_icon(struct webview *w, char *icon, uint32_t length
   int offset = LookupIconIdFromDirectoryEx(icon, TRUE, width, height, LR_DEFAULTCOLOR);
   if (offset != 0)
   {
-    HICON hIcon = CreateIconFromResourceEx(icon + offset, 0, TRUE, 0x00030000, width, height, LR_DEFAULTCOLOR);
+    HICON hIcon = CreateIconFromResourceEx(icon + offset, length - offset, TRUE, 0x00030000, width, height, LR_DEFAULTCOLOR);
     if (hIcon)
     {
       SendMessage(w->priv.hwnd, WM_SETICON, ICON_SMALL, (LPARAM)hIcon);
