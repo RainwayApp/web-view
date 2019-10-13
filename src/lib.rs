@@ -438,6 +438,11 @@ impl<'a, T> WebView<'a, T> {
         unsafe { webview_set_fullscreen(self.inner, fullscreen as _) };
     }
 
+    /// Minimizes the window.
+    pub fn minimize(&mut self) {
+        unsafe { webview_minimize(self.inner) };
+    }
+
     /// Returns a builder for opening a new dialog window.
     pub fn dialog<'b>(&'b mut self) -> DialogBuilder<'a, 'b, T> {
         DialogBuilder::new(self)

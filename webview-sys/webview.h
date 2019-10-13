@@ -167,6 +167,8 @@ WEBVIEW_API void webview_set_color(struct webview *w, uint8_t r, uint8_t g,
 WEBVIEW_API void webview_set_icon(struct webview *w, 
                                   char * icon, uint32_t length, 
                                   uint32_t width, uint32_t height);
+                                  
+WEBVIEW_API void webview_minimize(struct webview *w);
 WEBVIEW_API void webview_dialog(struct webview *w,
                                 enum webview_dialog_type dlgtype, int flags,
                                 const char *title, const char *arg,
@@ -379,6 +381,10 @@ WEBVIEW_API void webview_set_color(struct webview *w, uint8_t r, uint8_t g,
 }
 
 WEBVIEW_API void webview_set_icon(struct webview *w, char * icon, uint32_t length, uint32_t width, uint32_t height) {
+  
+}
+
+WEBVIEW_API void webview_minimize(struct webview *w) {
   
 }
 
@@ -1749,6 +1755,11 @@ WEBVIEW_API void webview_set_icon(struct webview *w, char *icon, uint32_t length
   }
 }
 
+WEBVIEW_API void webview_minimize(struct webview *w)
+{
+  ShowWindow(w->priv.hwnd, SW_MINIMIZE);
+}
+
 /* These are missing parts from MinGW */
 #ifndef __IFileDialog_INTERFACE_DEFINED__
 #define __IFileDialog_INTERFACE_DEFINED__
@@ -2418,6 +2429,10 @@ WEBVIEW_API void webview_set_color(struct webview *w, uint8_t r, uint8_t g,
 }
 
 WEBVIEW_API void webview_set_icon(struct webview *w, char * icon, uint32_t length, uint32_t width, uint32_t height) {
+
+}
+
+WEBVIEW_API void webview_minimize(struct webview *w) {
 
 }
 
