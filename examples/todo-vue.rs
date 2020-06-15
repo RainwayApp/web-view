@@ -23,14 +23,14 @@ fn main() {
 				</div>
 				<![endif]-->
 				<!--[if gte IE 9 | !IE ]> <!-->
+				<div id="app"></div>
 				{scripts}
 				<![endif]-->
 			</body>
 		</html>
 		"#,
-        styles = inline_style(include_str!("todo/styles.css")),
-        scripts = inline_script(include_str!("todo/picodom.js"))
-            + &inline_script(include_str!("todo/app.js")),
+        styles = inline_style(include_str!("todo-vue/build/app.css")),
+        scripts = inline_script(include_str!("todo-vue/build/app.js"))
     );
 
     let mut webview = web_view::builder()
@@ -74,7 +74,7 @@ fn render(webview: &mut WebView<Vec<Task>>) -> WVResult {
     let render_tasks = {
         let tasks = webview.user_data();
         println!("{:#?}", tasks);
-        format!("rpc.render({})", serde_json::to_string(tasks).unwrap())
+        format!("app.fromRust({})", serde_json::to_string(tasks).unwrap())
     };
     webview.eval(&render_tasks)
 }

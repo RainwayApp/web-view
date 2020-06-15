@@ -9,28 +9,28 @@ use web_view::*;
 
 fn main() {
     let html = format!(
-        r#"
-		<!doctype html>
-		<html>
-			<head>
-				{styles}
-			</head>
-			<body>
-				<!--[if lt IE 9]>
-				<div class="ie-upgrade-container">
-					<p class="ie-upgrade-message">Please, upgrade Internet Explorer to continue using this software.</p>
-					<a class="ie-upgrade-link" target="_blank" href="https://www.microsoft.com/en-us/download/internet-explorer.aspx">Upgrade</a>
-				</div>
-				<![endif]-->
-				<!--[if gte IE 9 | !IE ]> <!-->
-				{scripts}
-				<![endif]-->
-			</body>
-		</html>
+        r#"<!doctype html>
+        <html>
+        <head>
+            <meta http-equiv="X-UA-Compatible" content="IE=edge">
+            <meta charset="UTF-8">
+            {styles}
+        </head>
+        <body>
+            <!--[if lt IE 11]>
+            <div class="ie-upgrade-container">
+                <p class="ie-upgrade-message">Please, upgrade Internet Explorer to continue using this software.</p>
+                <a class="ie-upgrade-link" target="_blank" href="https://www.microsoft.com/en-us/download/internet-explorer.aspx">Upgrade</a>
+            </div>
+            <![endif]-->
+            <div id="elm"></div>
+            {scripts}
+        </body>
+        </html>
 		"#,
-        styles = inline_style(include_str!("todo/styles.css")),
-        scripts = inline_script(include_str!("todo/picodom.js"))
-            + &inline_script(include_str!("todo/app.js")),
+        styles = inline_style(include_str!("todo-elm/styles.css")),
+        scripts = inline_script(include_str!("todo-elm/elm.js"))
+            + &inline_script(include_str!("todo-elm/app.js")),
     );
 
     let mut webview = web_view::builder()
@@ -47,7 +47,12 @@ fn main() {
                 let tasks = webview.user_data_mut();
 
                 match serde_json::from_str(arg).unwrap() {
-                    Init => (),
+                    Init => {
+                        *tasks = vec![Task {
+                            name: "Create Elm example".to_string(),
+                            done: true,
+                        }];
+                    }
                     Log { text } => println!("{}", text),
                     AddTask { name } => tasks.push(Task { name, done: false }),
                     MarkTask { index, done } => tasks[index].done = done,
@@ -74,7 +79,10 @@ fn render(webview: &mut WebView<Vec<Task>>) -> WVResult {
     let render_tasks = {
         let tasks = webview.user_data();
         println!("{:#?}", tasks);
-        format!("rpc.render({})", serde_json::to_string(tasks).unwrap())
+        format!(
+            "app.ports.fromRust.send({})",
+            serde_json::to_string(tasks).unwrap()
+        )
     };
     webview.eval(&render_tasks)
 }
@@ -86,7 +94,7 @@ struct Task {
 }
 
 #[derive(Deserialize)]
-#[serde(tag = "cmd", rename_all = "camelCase")]
+#[serde(tag = "cmd")]
 pub enum Cmd {
     Init,
     Log { text: String },
