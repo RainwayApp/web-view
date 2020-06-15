@@ -108,7 +108,6 @@ pub struct WebViewBuilder<'a, T: 'a, I, C> {
     pub width: i32,
     pub height: i32,
     pub resizable: bool,
-    pub borderless: bool,
     pub debug: bool,
     pub invoke_handler: Option<I>,
     pub user_data: Option<T>,
@@ -132,7 +131,6 @@ where
             width: 800,
             height: 600,
             resizable: true,
-            borderless: false,
             debug,
             invoke_handler: None,
             user_data: None,
@@ -181,14 +179,6 @@ where
     /// Defaults to `true`.
     pub fn resizable(mut self, resizable: bool) -> Self {
         self.resizable = resizable;
-        self
-    }
-
-    /// Sets the window style of the WebView window. If set to true, the window will have no frame.
-    ///
-    /// Defaults to `true`.
-    pub fn borderless(mut self, borderless: bool) -> Self {
-        self.borderless = borderless;
         self
     }
 
@@ -253,7 +243,6 @@ where
             self.width,
             self.height,
             self.resizable,
-            self.borderless,
             self.debug,
             self.frameless,
             user_data,
@@ -309,7 +298,6 @@ impl<'a, T> WebView<'a, T> {
         width: i32,
         height: i32,
         resizable: bool,
-        borderless: bool,
         debug: bool,
         frameless: bool,
         user_data: T,
@@ -325,14 +313,6 @@ impl<'a, T> WebView<'a, T> {
             result: Ok(()),
         });
         let user_data_ptr = Box::into_raw(user_data);
-        
-        //currently borderless resizing is wonky, so this disables that combo.
-        let temp_resize = if resizable == true && borderless == true {
-            false
-        } else {
-            true
-        };
-        
 
         unsafe {
             let inner = webview_new(
@@ -340,8 +320,7 @@ impl<'a, T> WebView<'a, T> {
                 url.as_ptr(),
                 width,
                 height,
-                temp_resize as _,
-                borderless as _,
+                resizable as _,
                 debug as _,
                 frameless as _,
                 Some(ffi_invoke_handler::<T>),
@@ -444,7 +423,7 @@ impl<'a, T> WebView<'a, T> {
 
     pub fn set_icon<I: Into<Icon>>(&mut self, icon: I) {
         let icon = icon.into();
-        unsafe { webview_set_icon(self.inner, icon.data.as_ptr() as _, icon.length, icon.width, icon.height) }
+        unsafe { webview_set_icon(self.inner.unwrap(), icon.data.as_ptr() as _, icon.length, icon.width, icon.height) }
     }
 
     /// Sets the title displayed at the top of the window.
@@ -467,7 +446,7 @@ impl<'a, T> WebView<'a, T> {
 
     /// Minimizes the window.
     pub fn minimize(&mut self) {
-        unsafe { webview_minimize(self.inner) };
+        unsafe { webview_minimize(self.inner.unwrap()) };
     }
 
     /// Returns a builder for opening a new dialog window.

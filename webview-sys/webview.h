@@ -37,6 +37,11 @@ WEBVIEW_API void* webview_get_user_data(webview_t w);
 WEBVIEW_API webview_t webview_new(const char* title, const char* url, int width, int height, int resizable, int debug, int frameless, webview_external_invoke_cb_t external_invoke_cb, void* userdata);
 WEBVIEW_API void webview_free(webview_t w);
 WEBVIEW_API void webview_destroy(webview_t w);
+WEBVIEW_API void webview_minimize(struct webview *w);
+
+WEBVIEW_API void webview_set_icon(struct webview *w, 
+                                  char * icon, uint32_t length, 
+                                  uint32_t width, uint32_t height);
 
 // TODO WEBVIEW_API void webview_navigate(webview_t w, const char* url);
 

@@ -8,6 +8,7 @@
 #include <mshtmhst.h>
 #include <mshtml.h>
 #include <shobjidl.h>
+#include <dwmapi.h>
 
 #include <stdio.h>
 
@@ -17,6 +18,7 @@
 #pragma comment(lib, "uuid.lib")
 #pragma comment(lib, "gdi32.lib")
 #pragma comment(lib, "user32.lib")
+#pragma comment(lib, "dwmapi.lib")
 
 // For GCC.
 #ifndef DPI_AWARENESS_CONTEXT_SYSTEM_AWARE
@@ -138,9 +140,7 @@ WEBVIEW_API webview_t webview_new(
   if (!resizable) {
       style &= ~(WS_SIZEBOX);
   }
-  if (frameless) {
-    style &= ~(WS_SYSMENU | WS_CAPTION | WS_MINIMIZEBOX | WS_MAXIMIZEBOX);
-  }
+  
 
   // Get DPI.
   HDC screen = GetDC(0);
@@ -197,6 +197,9 @@ WEBVIEW_API webview_t webview_new(
   ShowWindow(wv->hwnd, SW_SHOWDEFAULT);
   UpdateWindow(wv->hwnd);
   SetFocus(wv->hwnd);
+  if (frameless) {
+    SetFrameless(wv->hwnd, wv->width, wv->height);
+  }
 
   return wv;
 }
@@ -330,6 +333,33 @@ JS_Invoke(IDispatch *This, DISPID dispIdMember, REFIID riid, LCID lcid,
     }
   }
   return S_OK;
+}
+
+static TCHAR *PROPINST = TEXT("_CHtmlToolbarWindow_INST");
+static TCHAR *PROPPROC = TEXT("_CHtmlToolbarWindow_PROC");
+
+static LRESULT CALLBACK ChildWndProc(HWND hwnd, UINT message, WPARAM wParam, LPARAM lParam)
+{
+  WNDPROC fnOldWndProc = (WNDPROC)GetProp(hwnd, PROPPROC);
+  HWND parent = (HWND)GetProp(hwnd, PROPINST);
+  switch (message)
+  {
+    /*case WM_LBUTTONDOWN: {
+        POINT cursor = {GET_X_LPARAM(lParam), GET_Y_LPARAM(lParam)};
+        PostMessage(parent, WM_NCLBUTTONDOWN, HTCAPTION, MAKELPARAM(cursor.x, cursor.y));
+        break;
+      }*/
+
+  case WM_NCHITTEST:
+  {
+    POINT cursor = { ((int)(short)LOWORD(lParam)), ((int)(short)HIWORD(lParam))};
+    int hit_result = hit_test(hwnd, cursor, TRUE);
+    PostMessage(parent, WM_SETCURSOR, 0, hit_result);
+    //PostMessage(parent, WM_NCHITTEST, hit_result, lParam);
+    break;
+  }
+  }
+  return fnOldWndProc(hwnd, message, wParam, lParam);
 }
 
 static IDispatchVtbl ExternalDispatchTable = {
@@ -924,7 +954,42 @@ LRESULT CALLBACK wndproc(HWND hwnd, UINT uMsg, WPARAM wParam, LPARAM lParam) {
     UnEmbedBrowserObject(wv);
     PostQuitMessage(0);
     return TRUE;
+    case WM_NCCALCSIZE:
+  {
+    if (wParam == TRUE && wv != NULL && wv->frameless)
+    {
+      NCCALCSIZE_PARAMS *params = (NCCALCSIZE_PARAMS *)(lParam);
+      if (IsMaximized(hwnd))
+      {
+        AdjustMaximizedClientRect(hwnd, &params->rgrc[0]);
+      }
+      return 0;
+    }
+    break;
+  }
+  case WM_NCHITTEST:
+  {
+    if (wv && wv->frameless)
+    {
+       POINT cursor = { ((int)(short)LOWORD(lParam)), ((int)(short)HIWORD(lParam))};
+      return HitTest(hwnd, cursor, wv->frameless);
+    }
+  }
+  case WM_NCACTIVATE:
+  {
+    if (!IsCompositionEnabled())
+    {
+      // Prevents window frame reappearing on window activation
+      // in "basic" theme, where no aero shadow is present.
+      return 1;
+    }
+    break;
+  }
   case WM_SIZE: {
+     if (wv == NULL)
+    {
+      return TRUE;
+    }
     IWebBrowser2 *webBrowser2;
     IOleObject *browser = *wv->browser;
     if (browser->lpVtbl->QueryInterface(browser, iid_unref(&IID_IWebBrowser2),
@@ -942,8 +1007,154 @@ LRESULT CALLBACK wndproc(HWND hwnd, UINT uMsg, WPARAM wParam, LPARAM lParam) {
     (*f)(wv, arg);
     return TRUE;
   }
+  case WM_SETCURSOR:
+  {
+    switch ((int)lParam)
+    {
+    case HTLEFT:
+    case HTRIGHT:
+      SetCursor(LoadCursor(0, IDC_SIZENESW));
+      return 0;
+    case HTTOP:
+    case HTBOTTOM:
+      SetCursor(LoadCursor(0, IDC_SIZENS));
+      return 0;
+    case HTTOPRIGHT:
+    case HTBOTTOMLEFT:
+      SetCursor(LoadCursor(0, IDC_SIZENESW));
+      return 0;
+    case HTTOPLEFT:
+    case HTBOTTOMRIGHT:
+      SetCursor(LoadCursor(0, IDC_SIZENWSE));
+      return 0;
+    }
+  }
   }
   return DefWindowProc(hwnd, uMsg, wParam, lParam);
+}
+
+BOOL AdjustMaximizedClientRect(HWND window, RECT *rect)
+{
+  HMONITOR monitor = MonitorFromWindow(window, MONITOR_DEFAULTTONULL);
+  if (!monitor)
+  {
+    return FALSE;
+  }
+  MONITORINFO monitor_info = {0};
+  monitor_info.cbSize = sizeof(monitor_info);
+  if (!GetMonitorInfoW(monitor, &monitor_info))
+  {
+    return FALSE;
+  }
+
+  rect = &monitor_info.rcWork;
+  return TRUE;
+}
+
+BOOL IsMaximized(HWND hwnd)
+{
+  WINDOWPLACEMENT placement;
+  if (!GetWindowPlacement(hwnd, &placement))
+  {
+    return FALSE;
+  }
+
+  return placement.showCmd == SW_MAXIMIZE;
+}
+
+BOOL IsCompositionEnabled()
+{
+  int enabled = 0;
+  DwmIsCompositionEnabled(&enabled);
+  return (enabled == 1);
+}
+
+int SetFrameless(HWND hwnd, int width, int height)
+{
+
+  DWORD style = (WS_POPUP | WS_THICKFRAME | WS_CAPTION | WS_SYSMENU | WS_MAXIMIZEBOX | WS_MINIMIZEBOX | WS_CLIPCHILDREN);
+  if (IsCompositionEnabled())
+  {
+    style |= 0x00020000;
+  }
+  SetWindowLongPtr(hwnd, GWL_STYLE, style);
+
+  DWORD exStyles = GetWindowLong(hwnd, GWL_EXSTYLE);
+  exStyles |= WS_EX_TRANSPARENT;
+  SetWindowLongPtr(hwnd, GWL_EXSTYLE, exStyles);
+
+  if (IsCompositionEnabled())
+  {
+    auto Policy = DWMNCRP_ENABLED;
+    DwmSetWindowAttribute(hwnd, DWMWA_NCRENDERING_POLICY, &Policy, sizeof(Policy));
+    BOOL NCPaint = TRUE;
+    DwmSetWindowAttribute(hwnd, DWMWA_ALLOW_NCPAINT, &NCPaint, sizeof(NCPaint));
+    MARGINS margins = {.cxLeftWidth = 1,
+                       .cxRightWidth = 1,
+                       .cyTopHeight = 1,
+                       .cyBottomHeight = 1};
+    DwmExtendFrameIntoClientArea(hwnd, &margins);
+  }
+  SetWindowPos(hwnd, NULL, 0, 0, width, height, SWP_NOZORDER | SWP_NOMOVE | SWP_FRAMECHANGED);
+  ShowWindow(hwnd, SW_SHOW);
+}
+
+int HitTest(HWND hwnd, POINT cursor, BOOL resizeable)
+{
+  // identify borders and corners to allow resizing the window.
+  // Note: On Windows 10, windows behave differently and
+  // allow resizing outside the visible window frame.
+  // This implementation does not replicate that behavior.
+  const POINT border = {
+      GetSystemMetrics(SM_CXFRAME) + GetSystemMetrics(SM_CXPADDEDBORDER),
+      GetSystemMetrics(SM_CYFRAME) + GetSystemMetrics(SM_CXPADDEDBORDER)};
+
+  RECT window;
+  if (!GetWindowRect(hwnd, &window))
+  {
+    return HTNOWHERE;
+  }
+
+  const BOOL drag = HTCAPTION;
+
+  enum region_mask
+  {
+    client = 0b0000,
+    left = 0b0001,
+    right = 0b0010,
+    top = 0b0100,
+    bottom = 0b1000,
+  };
+
+  const auto result =
+      left * (cursor.x < (window.left + border.x)) |
+      right * (cursor.x >= (window.right - border.x)) |
+      top * (cursor.y < (window.top + border.y)) |
+      bottom * (cursor.y >= (window.bottom - border.y));
+
+  switch (result)
+  {
+  case left:
+    return resizeable ? HTLEFT : drag;
+  case right:
+    return resizeable ? HTRIGHT : drag;
+  case top:
+    return resizeable ? HTTOP : drag;
+  case bottom:
+    return resizeable ? HTBOTTOM : drag;
+  case top | left:
+    return resizeable ? HTTOPLEFT : drag;
+  case top | right:
+    return resizeable ? HTTOPRIGHT : drag;
+  case bottom | left:
+    return resizeable ? HTBOTTOMLEFT : drag;
+  case bottom | right:
+    return resizeable ? HTBOTTOMRIGHT : drag;
+  case client:
+    return drag;
+  default:
+    return HTNOWHERE;
+  }
 }
 
 WEBVIEW_API int webview_loop(webview_t w, int blocking) {
@@ -979,6 +1190,16 @@ WEBVIEW_API int webview_loop(webview_t w, int blocking) {
     }
   }
   default:
+  // allows for dragging of the UI
+    if (msg.message == WM_LBUTTONDOWN && wv->frameless)
+    {
+      POINT cursor = { ((int)(short)LOWORD(msg.lParam)), ((int)(short)HIWORD(msg.lParam))};
+      BOOL testDrag = cursor.y <= 70;
+      if (testDrag == TRUE)
+      {
+        PostMessage(wv->hwnd, WM_NCLBUTTONDOWN, HTCAPTION, MAKELPARAM(cursor.x, cursor.y));
+      }
+    }
     TranslateMessage(&msg);
     DispatchMessage(&msg);
   }
@@ -1065,6 +1286,12 @@ WEBVIEW_API void webview_set_title(webview_t w, const char *title) {
   SysFreeString(window_title);
 }
 
+WEBVIEW_API void webview_minimize(struct webview *w)
+{
+  struct mshtml_webview* wv = (struct mshtml_webview*)w;
+  ShowWindow(wv->hwnd, SW_MINIMIZE);
+}
+
 WEBVIEW_API void webview_set_fullscreen(webview_t w, int fullscreen) {
   struct mshtml_webview* wv = (struct mshtml_webview*)w;
   if (wv->is_fullscreen == !!fullscreen) {
@@ -1120,3 +1347,18 @@ WEBVIEW_API void webview_exit(webview_t w) {
 }
 
 WEBVIEW_API void webview_print_log(const char *s) { OutputDebugString(s); }
+
+WEBVIEW_API void webview_set_icon(struct webview *w, char *icon, uint32_t length, uint32_t width, uint32_t height)
+{
+  struct mshtml_webview* wv = (struct mshtml_webview*)w;
+  int offset = LookupIconIdFromDirectoryEx(icon, TRUE, width, height, LR_DEFAULTCOLOR);
+  if (offset != 0)
+  {
+    HICON hIcon = CreateIconFromResourceEx(icon + offset, length - offset, TRUE, 0x00030000, width, height, LR_DEFAULTCOLOR);
+    if (hIcon)
+    {
+      SendMessage(wv->hwnd, WM_SETICON, ICON_SMALL, (LPARAM)hIcon);
+      SendMessage(wv->hwnd, WM_SETICON, ICON_BIG, (LPARAM)hIcon);
+    }
+  }
+}
